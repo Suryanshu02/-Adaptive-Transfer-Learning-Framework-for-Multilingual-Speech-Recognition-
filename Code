@@ -1,0 +1,155 @@
+import streamlit as st
+import speech_recognition as sr
+from deep_translator import GoogleTranslator
+from gtts import gTTS
+import tempfile
+
+st.set_page_config(layout="centered", page_title="VoiceX")
+
+languages = {
+    "English": "en",
+    "Hindi": "hi",
+    "Bhojpuri": "bho",
+    "Haryanvi": "hary",
+    "Telugu": "te",
+    "Tamil": "ta",
+    "Malayalam": "ml",
+    "Kannada": "kn",
+    "Marathi": "mr",
+    "Gujarati": "gu",
+    "Bengali": "bn",
+    "Punjabi": "pa",
+    "Odia": "or",
+    "Urdu": "ur",
+    "Spanish": "es",
+    "French": "fr",
+    "German": "de",
+    "Japanese": "ja",
+    "Korean": "ko",
+    "Chinese": "zh-CN",
+    "Arabic": "ar"
+}
+
+bhojpuri_map = {
+    "आप": "रउआ",
+    "कैसे": "कइसन",
+    "हैं": "बानी",
+    "मैं": "हम",
+    "मेरा": "हमार",
+    "क्या": "का",
+    "क्यों": "काहे",
+    "धन्यवाद": "धन्यवाद बा"
+}
+
+haryanvi_map = {
+    "आप": "तू",
+    "कैसे": "कैस्यां",
+    "हैं": "सै",
+    "मैं": "मैं",
+    "मेरा": "म्हारा",
+    "क्या": "के",
+    "क्यों": "क्यूं",
+    "धन्यवाद": "धन्यवाद सै"
+}
+
+def hindi_to_bhojpuri(text):
+    for k, v in bhojpuri_map.items():
+        text = text.replace(k, v)
+    return text
+
+def hindi_to_haryanvi(text):
+    for k, v in haryanvi_map.items():
+        text = text.replace(k, v)
+    return text
+
+st.markdown("""
+<style>
+body, .stApp {
+    background: linear-gradient(135deg, #0d0d1a, #2b003e, #8f00ff);
+    color: white;
+    font-family: Arial;
+}
+
+.card {
+    background: rgba(0,0,0,0.6);
+    padding: 22px;
+    border-radius: 18px;
+    margin-bottom: 20px;
+}
+
+.output-box {
+    background: rgba(0,0,0,0.6);
+    padding: 15px;
+    border-radius: 14px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("<h1 style='text-align:center'>VoiceX</h1>", unsafe_allow_html=True)
+
+if "recognized" not in st.session_state:
+    st.session_state.recognized = ""
+if "translated" not in st.session_state:
+    st.session_state.translated = ""
+
+input_lang = st.selectbox("Input Language", list(languages.keys()))
+output_lang = st.selectbox("Output Language", list(languages.keys()))
+
+if st.button("Start Listening"):
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        audio = r.listen(source)
+    try:
+        base_lang = "hi" if output_lang in ["Bhojpuri", "Haryanvi"] else languages[input_lang]
+        text = r.recognize_google(audio, language=base_lang)
+        st.session_state.recognized = text
+
+        if output_lang == "Bhojpuri":
+            st.session_state.translated = hindi_to_bhojpuri(text)
+        elif output_lang == "Haryanvi":
+            st.session_state.translated = hindi_to_haryanvi(text)
+        else:
+            st.session_state.translated = GoogleTranslator(
+                source="auto",
+                target=languages[output_lang]
+            ).translate(text)
+    except:
+        st.session_state.recognized = "Could not understand"
+        st.session_state.translated = ""
+
+if st.session_state.recognized:
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div class='output-box'><b>Recognized:</b><br>{st.session_state.recognized}</div>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        f"<div class='output-box'><b>Translated:</b><br>{st.session_state.translated}</div>",
+        unsafe_allow_html=True
+    )
+
+    tts_lang = "hi" if output_lang in ["Bhojpuri", "Haryanvi"] else languages[output_lang]
+    tts = gTTS(st.session_state.translated, lang=tts_lang)
+    temp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+    tts.save(temp.name)
+    st.audio(temp.name)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+txt = st.text_area("Type text for TTS")
+txt_lang = st.selectbox("Text Language", list(languages.keys()))
+
+if st.button("Generate Audio"):
+    if txt_lang == "Bhojpuri":
+        result = hindi_to_bhojpuri(txt)
+        tts_lang = "hi"
+    elif txt_lang == "Haryanvi":
+        result = hindi_to_haryanvi(txt)
+        tts_lang = "hi"
+    else:
+        result = GoogleTranslator(source="auto", target=languages[txt_lang]).translate(txt)
+        tts_lang = languages[txt_lang]
+
+    t = gTTS(result, lang=tts_lang)
+    temp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+    t.save(temp.name)
+    st.audio(temp.name)
